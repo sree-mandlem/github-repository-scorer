@@ -1,2 +1,7 @@
 spring:
   application.name: github-repository-scorer
+
+github:
+  api:
+    page-size: 100
+    max-pages: 10

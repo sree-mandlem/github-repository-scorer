@@ -1,0 +1,5 @@
+github:
+  api:
+    base-url: http://localhost:9999
+    page-size: 100
+    max-pages: 10

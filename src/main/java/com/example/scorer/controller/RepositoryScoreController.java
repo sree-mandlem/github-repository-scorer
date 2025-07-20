@@ -24,11 +24,15 @@ public class RepositoryScoreController {
 
     @GetMapping("/score")
     public ResponseEntity<List<ScoreResult>> getScoredRepositories(
-            @RequestParam("created_after") String createdAfter,
-            @RequestParam("language") String language) {
+            @RequestParam String created_after,
+            @RequestParam String language,
+            @RequestParam(required = false) Integer pageSize,
+            @RequestParam(required = false) Integer maxPages) {
 
-        log.info("Received request to score repositories created after '{}' with language '{}'",
-                createdAfter, language);
-        return ResponseEntity.ok(githubSearchService.fetchAndScoreRepositories(createdAfter, language));
+        List<ScoreResult> results = (pageSize == null && maxPages == null)
+                ? githubSearchService.fetchAndScoreRepositories(created_after, language)
+                : githubSearchService.fetchAndScoreRepositories(created_after, language, pageSize, maxPages);
+
+        return ResponseEntity.ok(results);
     }
 }
