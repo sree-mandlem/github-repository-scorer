@@ -1,7 +1,6 @@
 package com.example.scorer.api;
 
 import com.example.scorer.model.GithubSearchResponse;
-import com.example.scorer.model.Pagination;
 import com.example.scorer.model.RepositoryDto;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,7 +12,6 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -31,52 +29,41 @@ public class GithubApiClient {
         this.objectMapper = objectMapper;
     }
 
-    public List<RepositoryDto> searchRepositories(String createdAfter, String language, Pagination pagination) {
-        log.info("GitHub repository search - language='{}', createdAfter='{}', page size='{}', max pages '{}'",
-                language, createdAfter, pagination.getPageSize(), pagination.getMaxPages());
+    public List<RepositoryDto> searchRepositories(String createdAfter, String language, int page, int pageSize) {
+        log.info("GitHub repository search - language='{}', createdAfter='{}', page='{}', page size '{}'",
+                language, createdAfter, page, pageSize);
 
-        List<RepositoryDto> allRepos = new ArrayList<>();
-        int page = 1;
+        String url = buildSearchUrl(createdAfter, language, page, pageSize);
+        log.debug("GitHub API URL: {}", url);
 
-        while (page <= pagination.getMaxPages()) {
-            String url = buildSearchUrl(createdAfter, language, page, pagination);
-            log.debug("GitHub API URL: {}", url);
+        try {
+            var response = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
+            log.info("GitHub API responded with status: {}", response.getStatusCode());
 
-            try {
-                var response = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
-                log.info("GitHub API responded with status: {}", response.getStatusCode());
+            var searchResponse = objectMapper.readValue(response.getBody(), GithubSearchResponse.class);
+            log.debug("Parsed {} repositories from GitHub response", searchResponse.getItems().size());
 
-                var searchResponse = objectMapper.readValue(response.getBody(), GithubSearchResponse.class);
-                if (searchResponse.getItems().isEmpty()) break;
-                log.debug("Parsed {} repositories from GitHub response", searchResponse.getItems().size());
-
-                allRepos.addAll(searchResponse.getItems());
-            } catch (HttpServerErrorException e) {
-                log.error("GitHub API request failed: {}", e.getMessage());
-                throw e;
-            } catch (JsonProcessingException e) {
-                log.error("Failed to parse GitHub response", e);
-                throw new RuntimeException("JSON processing error", e);
-            } catch (RestClientException e) {
-                log.warn("GitHub API request failed: {}", e.getMessage());
-                throw e;
-            }
-
-            page++;
+            return searchResponse.getItems();
+        } catch (HttpServerErrorException e) {
+            log.error("GitHub API request failed: {}", e.getMessage());
+            throw e;
+        } catch (JsonProcessingException e) {
+            log.error("Failed to parse GitHub response", e);
+            throw new RuntimeException("JSON processing error", e);
+        } catch (RestClientException e) {
+            log.warn("GitHub API request failed: {}", e.getMessage());
+            throw e;
         }
-
-        return allRepos;
     }
 
-
-    private String buildSearchUrl(String createdAfter, String language, int page, Pagination pagination) {
+    private String buildSearchUrl(String createdAfter, String language, int page, int pageSize) {
         return String.format(
-                "%s/search/repositories?q=language:%s+created:>%s&sort=stars&order=desc&per_page=%d&page=%d",
+                "%s/search/repositories?q=language:%s+created:>%s&sort=stars&order=desc&page=%d&per_page=%d",
                 githubBaseUrl,
                 language,
                 createdAfter,
-                pagination.getPageSize(),
-                page
+                page,
+                pageSize
         );
     }
 }
