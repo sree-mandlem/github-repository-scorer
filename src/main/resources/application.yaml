@@ -1,10 +1,25 @@
 spring:
   application.name: github-repository-scorer
 
+springdoc:
+  api-docs:
+    path: /scorer/v3/api-docs
+  swagger-ui:
+    path: /scorer/swagger-ui.html
+
 github:
   api:
     page-size: 100
     max-pages: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    metrics:
+      access: read_only
 
 resilience4j:
   retry:
