@@ -29,7 +29,7 @@ Score = stars × 1.0 + forks × 0.75 + max(0, 30 - days\_since\_update)
 - Jackson (with Java Time Module)
 - JUnit 5 + Mockito + AssertJ
 - Awaitility + MockRestServiceServer (for integration testing)
-- Spring Doc Open API generator with Swagger UI (Has known vulnerabilities)
+- Spring Doc Open API generator with Swagger UI (⚠️ Has known vulnerabilities)
 
 ## 📥 API Usage
 
@@ -37,8 +37,10 @@ Score = stars × 1.0 + forks × 0.75 + max(0, 30 - days\_since\_update)
 
 | Param          | Required | Example         |
 |----------------|----------|-----------------|
-| `created_after`| ✅        | `2024-01-01`     |
-| `language`     | ✅        | `Java`           |
+| `created_after`| ✅        | `2024-01-01    |
+| `language`     | ✅        | `Java`         |
+| `pageSize`     |           | `100`          |
+| `maxPages`     |           | `10`           |
 
 **Response:**
 ```json
