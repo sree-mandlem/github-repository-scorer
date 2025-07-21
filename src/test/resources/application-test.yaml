@@ -3,3 +3,26 @@ github:
     base-url: http://localhost:9999
     page-size: 100
     max-pages: 10
+
+resilience4j:
+  retry:
+    instances:
+      githubSearch:
+        max-attempts: 1
+        wait-duration: 100ms
+        retry-exceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.RestClientException
+        ignore-exceptions:
+          - com.fasterxml.jackson.core.JsonProcessingException
+  circuitbreaker:
+    instances:
+      githubSearch:
+        sliding-window-size: 2
+        minimum-number-of-calls: 2
+        permitted-number-of-calls-in-half-open-state: 1
+  ratelimiter:
+    instances:
+      githubSearch:
+        limit-for-period: 10
+        limit-refresh-period: 1s

@@ -12,7 +12,6 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -49,6 +48,8 @@ class GithubSearchServiceTest {
         Mockito.when(scoringService.calculateScore(repo)).thenReturn(score);
         when(asyncFetcher.fetchPage(eq(createdAfter), eq(language), eq(1), eq(10)))
                 .thenReturn(CompletableFuture.completedFuture(List.of(repo)));
+        when(asyncFetcher.fetchPage(eq(createdAfter), eq(language), intThat(page -> page >= 2 && page <= 100), eq(10)))
+                .thenReturn(CompletableFuture.completedFuture(List.of()));
 
         List<ScoreResult> result = searchService.fetchAndScoreRepositories(createdAfter, language);
 
@@ -73,14 +74,16 @@ class GithubSearchServiceTest {
                 .thenReturn(CompletableFuture.completedFuture(List.of(repo1)));
         when(asyncFetcher.fetchPage(eq(createdAfter), eq(language), eq(2), eq(10)))
                 .thenReturn(CompletableFuture.completedFuture(List.of(repo2)));
-        when(asyncFetcher.fetchPage(eq(createdAfter), eq(language), eq(3), eq(10)))
-                .thenReturn(CompletableFuture.completedFuture(Collections.emptyList()));
+        when(asyncFetcher.fetchPage(eq(createdAfter), eq(language), intThat(page -> page >= 3 && page <= 100), eq(10)))
+                .thenReturn(CompletableFuture.completedFuture(List.of()));
 
         List<ScoreResult> result = searchService.fetchAndScoreRepositories(createdAfter, language, 10, 100);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).getName()).isEqualTo("test-repo1");
         assertThat(result.get(0).getScore()).isEqualTo(score1);
+        assertThat(result.get(1).getName()).isEqualTo("test-repo2");
+        assertThat(result.get(1).getScore()).isEqualTo(score2);
         verify(scoringService).calculateScore(repo2);
         verify(asyncFetcher).fetchPage(eq(createdAfter), eq(language), eq(1), eq(10));
         verify(asyncFetcher).fetchPage(eq(createdAfter), eq(language), eq(2), eq(10));

@@ -20,16 +20,32 @@ public class GithubApiClient {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final ResilienceExecutor resilienceExecutor;
+    private final GithubSearchFallbackHandler fallbackHandler;
 
     @Value("${github.api.base-url:https://api.github.com}")
     private String githubBaseUrl;
 
-    public GithubApiClient(RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public GithubApiClient(
+            RestTemplate restTemplate,
+            ObjectMapper objectMapper,
+            ResilienceExecutor resilienceExecutor,
+            GithubSearchFallbackHandler fallbackHandler) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
+        this.resilienceExecutor = resilienceExecutor;
+        this.fallbackHandler = fallbackHandler;
     }
 
     public List<RepositoryDto> searchRepositories(String createdAfter, String language, int page, int pageSize) {
+        return resilienceExecutor.execute(
+                "githubSearch",
+                () -> callGithubApi(createdAfter, language, page, pageSize),
+                throwable -> fallbackHandler.handle(createdAfter, language, page, pageSize, throwable)
+        );
+    }
+
+    private List<RepositoryDto> callGithubApi(String createdAfter, String language, int page, int pageSize) {
         log.info("GitHub repository search - language='{}', createdAfter='{}', page='{}', page size '{}'",
                 language, createdAfter, page, pageSize);
 
@@ -46,13 +62,13 @@ public class GithubApiClient {
             return searchResponse.getItems();
         } catch (HttpServerErrorException e) {
             log.error("GitHub API request failed: {}", e.getMessage());
-            throw e;
+            throw e; // Retryable
         } catch (JsonProcessingException e) {
             log.error("Failed to parse GitHub response", e);
             throw new RuntimeException("JSON processing error", e);
         } catch (RestClientException e) {
             log.warn("GitHub API request failed: {}", e.getMessage());
-            throw e;
+            throw e; // Retryable
         }
     }
 

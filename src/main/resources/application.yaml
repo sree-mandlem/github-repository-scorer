@@ -5,3 +5,26 @@ github:
   api:
     page-size: 100
     max-pages: 10
+
+resilience4j:
+  retry:
+    instances:
+      githubSearch:
+        max-attempts: 3
+        wait-duration: 2s
+        retry-exceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.RestClientException
+          - java.io.IOException
+  circuitbreaker:
+    instances:
+      githubSearch:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 15s
+  ratelimiter:
+    instances:
+      githubSearch:
+        limit-for-period: 10
+        limit-refresh-period: 1s
+        timeout-duration: 0

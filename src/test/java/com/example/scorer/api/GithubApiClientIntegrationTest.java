@@ -1,6 +1,8 @@
 package com.example.scorer.api;
 
 import com.example.scorer.model.RepositoryDto;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -8,8 +10,6 @@ import org.springframework.http.*;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.client.ExpectedCount;
-import org.springframework.web.client.HttpServerErrorException;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
@@ -17,7 +17,6 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.hamcrest.Matchers.containsString;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
@@ -31,11 +30,16 @@ class GithubApiClientIntegrationTest {
     @Autowired
     private GithubApiClient githubApiClient;
 
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
     private MockRestServiceServer server;
 
     @BeforeEach
     void setUp() {
         server = MockRestServiceServer.createServer(restTemplate);
+        // Reset the Circuit Breaker
+        circuitBreakerRegistry.getAllCircuitBreakers().forEach(CircuitBreaker::reset);
     }
 
     @Test
@@ -66,43 +70,31 @@ class GithubApiClientIntegrationTest {
     }
 
     @Test
-    void shouldThrowOnHttp5xx() {
+    void shouldReturnEmptyList_OnHttp5xx() {
         server.expect(requestTo(containsString("/search/repositories")))
                 .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
 
-        assertThrows(HttpServerErrorException.class,
-                () -> githubApiClient.searchRepositories("2024-01-01", "Java", 1, 10));
+        List<RepositoryDto> results = githubApiClient.searchRepositories("2024-01-01", "Java", 1, 10);
+
+        assertThat(results).isEmpty();
+        server.verify();
     }
 
     @Test
-    void shouldThrowOnInvalidJson() {
+    void shouldReturnEmptyList_OnInvalidJson() {
         server.expect(requestTo(containsString("/search/repositories")))
                 .andRespond(withSuccess("INVALID_JSON", MediaType.APPLICATION_JSON));
 
-        RuntimeException ex = assertThrows(RuntimeException.class,
-                () -> githubApiClient.searchRepositories("2024-01-01", "Java", 1, 10));
-        assertThat(ex.getMessage()).contains("JSON processing error");
+        List<RepositoryDto> results = githubApiClient.searchRepositories("2024-01-01", "Java", 1, 10);
+
+        assertThat(results).isEmpty();
+        server.verify();
     }
 
     @Test
-    void shouldThrowOnRestClientException() {
+    void shouldReturnEmptyList_OnRestClientException() {
         server.expect(requestTo(containsString("/search/repositories")))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
-
-        assertThrows(RestClientException.class,
-                () -> githubApiClient.searchRepositories("2024-01-01", "Java", 1, 10));
-    }
-
-    @Test
-    void shouldStopFetchingIfFirstPageIsEmpty() {
-        String emptyPageJson = """
-            {
-              "items": []
-            }
-            """;
-
-        server.expect(ExpectedCount.once(), requestTo(containsString("page=1")))
-                .andRespond(withSuccess(emptyPageJson, MediaType.APPLICATION_JSON));
 
         List<RepositoryDto> results = githubApiClient.searchRepositories("2024-01-01", "Java", 1, 10);
 
